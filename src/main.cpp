@@ -2,7 +2,7 @@
 #include "Arduino.h"
 #include <FastLED.h>
 
-#define NUM_LEDS 5
+#define NUM_LEDS 20
 
 // Data pin that led data will be written out over
 #define DATA_PIN 3
@@ -12,6 +12,14 @@
 
 #define BRIGHTNESS 20
 
+//Buttons
+#define BTN_LEFT 4
+#define BTN_RIGHT 5
+
+//Params for buttons
+int btn_left_state = 0;
+int btn_right_state = 0;
+
 // Params for width and height
 const uint8_t kMatrixWidth = 5;
 const uint8_t kMatrixHeight = 1;
@@ -20,6 +28,8 @@ const uint8_t kMatrixHeight = 1;
 const bool kMatrixSerpentineLayout = true;
 
 CRGB leds[NUM_LEDS];
+int matrix[5];
+int ballPos = 0;
 
 // Set LED_BUILTIN if it is not defined by Arduino framework
 // #define LED_BUILTIN 13
@@ -85,31 +95,36 @@ void doCrazyShit()
 
 void setup()
 {
+  //sanity delay
   delay(2000);
+
+  Serial.begin(9600);
 
   // initialize LED digital pin as an output.
   // pinMode(LED_BUILTIN, OUTPUT);
 
+  pinMode(BTN_LEFT, INPUT);
+  pinMode(BTN_RIGHT, INPUT);
+
   FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(BRIGHTNESS);
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+    matrix[i] = 0;
+  }
 }
 
-void loop()
-{
-  // for (int whiteLed = 0; whiteLed < NUM_LEDS; whiteLed = whiteLed + 1)
-  // {
-  //   // Turn our current led on to white, then show the leds
-  //   leds[whiteLed] = CRGB::White;
+void loop() {
 
-  //   // Show the leds (only one of which is set to white, from above)
-  //   FastLED.show();
+  handleInput();
+  resetMatrix();
+  matrix[ballPos] = 1;
+  convertMatrixToLEDs();
+  FastLED.show();
+  Serial.println(ballPos);
+  delay(200);
 
-  //   // Wait a little bit
-  //   delay(150);
-
-  //   // Turn our current led back to black for the next loop around
-  //   leds[whiteLed] = CRGB::Black;
-  // }
+//    doCrazyShit();
 
   // leds[XY(1, 1)] = CRGB::Red;
   // FastLED.show();
@@ -120,9 +135,51 @@ void loop()
   // leds[XY(3, 1)] = CRGB::Red;
   // FastLED.show();
 
-  byte x = 1;
-  byte y = 1;
+  //byte x = 1;
+  //byte y = 1;
 
-  leds[ XY( x, y) ] = CHSV( random8(), 255, 255);
-  FastLED.show();
+//  leds[ XY( 4, 0) ] = CHSV( random8(), 255, 255);
+//  FastLED.show();
+}
+
+void resetMatrix() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    matrix[i] = 0;
+  }
+}
+
+void convertMatrixToLEDs() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+    if (matrix[i] == 1) {
+      Serial.print("matrix[i] == 1 for i:");
+      Serial.println(i);
+      leds[i] = CRGB::Red;
+    } else {
+      Serial.print("matrix[i] == 0 for i:");
+      Serial.println(i);
+      leds[i] = CRGB::Black;
+    }
+  }
+
+  Serial.println("==LED Array==");
+  for (int i = 0; i < NUM_LEDS; i++) {
+    Serial.print("leds["); 
+    Serial.print(i);
+    Serial.print("] = ");
+    Serial.println(leds[i]);
+  }
+
+}
+
+void handleInput() {
+  btn_left_state = digitalRead(BTN_LEFT);
+  btn_right_state = digitalRead(BTN_RIGHT);
+
+  if (btn_left_state == 1 && ballPos > 0) {
+    ballPos--;
+    Serial.println("left button pressed");
+  } else if (btn_right_state == 1 && ballPos < NUM_LEDS) {
+    ballPos++;
+    Serial.println("right button pressed");
+  }
 }

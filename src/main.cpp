@@ -2,7 +2,7 @@
 #include "Arduino.h"
 #include <FastLED.h>
 
-#define NUM_LEDS 20
+#define NUM_LEDS 49
 
 // Data pin that led data will be written out over
 #define DATA_PIN 3
@@ -16,13 +16,17 @@
 #define BTN_LEFT 4
 #define BTN_RIGHT 5
 
+//Direction for boards
+#define LEFT 0
+#define RIGHT 1
+
 //Params for buttons
 int btn_left_state = 0;
 int btn_right_state = 0;
 
 // Params for width and height
-const uint8_t kMatrixWidth = 5;
-const uint8_t kMatrixHeight = 1;
+const uint8_t kMatrixWidth = 7;
+const uint8_t kMatrixHeight = 7;
 
 // Param for different pixel layouts
 const bool kMatrixSerpentineLayout = true;
@@ -31,9 +35,34 @@ CRGB leds[NUM_LEDS];
 int matrix[5];
 int ballPos = 0;
 
-// Set LED_BUILTIN if it is not defined by Arduino framework
-// #define LED_BUILTIN 13
+/* Matrix layout:
+Start ->
+{0, 0, 1, 1, 1, 0, 0}  --> Board 1
+  0, 0, 0, 0, 0, 0, 0
+  0, 0, 0, 0, 0, 0, 0
+  0, 0, 1, 0, 0, 0, 0  --> Ball
+  0, 0, 0, 0, 0, 0, 0
+  0, 0, 0, 0, 0, 0, 0
+{0, 0, 1, 1, 1, 0, 0}  --> Board 2
+              -> End
+*/
 
+int matrix2D[7][7] = {
+  {1, 1, 1, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 1, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 1, 1, 1}
+};
+
+int board1[7] = {1, 1, 1, 0, 0, 0, 0};
+int board2[7] = {0, 0, 0, 0, 1, 1, 1};
+//Position as {x, y}
+int ballPos2D[2] = {2, 3};
+
+//== FastLED Methods ==
 uint16_t XY(uint8_t x, uint8_t y)
 {
   uint16_t i;
@@ -93,6 +122,8 @@ void doCrazyShit()
   FastLED.show();
 }
 
+//== Normal Arduino Code ==
+
 void setup()
 {
   //sanity delay
@@ -126,20 +157,23 @@ void loop() {
 
 //    doCrazyShit();
 
-  // leds[XY(1, 1)] = CRGB::Red;
-  // FastLED.show();
-
-  // delay(500);
-
-  // leds[XY(1, 1)] = CRGB::Black;
-  // leds[XY(3, 1)] = CRGB::Red;
-  // FastLED.show();
-
-  //byte x = 1;
-  //byte y = 1;
-
 //  leds[ XY( 4, 0) ] = CHSV( random8(), 255, 255);
 //  FastLED.show();
+}
+
+void updateMatrix2D() {
+  resetMatrix2D();
+
+  for (int x = 0; x < kMatrixWidth; x++) {
+    //Run through the first row of the matrix and apply board1
+    matrix2D[0][x] = board1[x];  
+  }
+  for (int x = 0; x < kMatrixWidth; x++) {
+    //Run through the last row of the matrix and apply board2
+    matrix2D[kMatrixHeight-1][x] = board2[x];  
+  }
+
+  matrix2D[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
 }
 
 void resetMatrix() {
@@ -147,39 +181,105 @@ void resetMatrix() {
     matrix[i] = 0;
   }
 }
+void resetMatrix2D() {
+  for (int i = 0; i < kMatrixWidth; i++) {
+    for (int j = 0; i < kMatrixHeight; i++) {
+      matrix2D[i][j] = 0;
+    }
+  }
+
+//OR
+
+  for(auto& rows: matrix2D){
+    for(auto& elem: rows){
+        elem = 0;
+    }
+  }
+}
 
 void convertMatrixToLEDs() {
   for (int i = 0; i < NUM_LEDS; i++) {
     if (matrix[i] == 1) {
-      Serial.print("matrix[i] == 1 for i:");
-      Serial.println(i);
       leds[i] = CRGB::Red;
     } else {
-      Serial.print("matrix[i] == 0 for i:");
-      Serial.println(i);
       leds[i] = CRGB::Black;
     }
   }
 
-  Serial.println("==LED Array==");
-  for (int i = 0; i < NUM_LEDS; i++) {
-    Serial.print("leds["); 
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(leds[i]);
-  }
+  // Serial.println("==LED Array==");
+  // for (int i = 0; i < NUM_LEDS; i++) {
+  //   Serial.print("leds["); 
+  //   Serial.print(i);
+  //   Serial.print("] = ");
+  //   Serial.println(leds[i]);
+  // }
+}
 
+void convertMatrix2DToLEDs() {
+  for (int i = 0; i < kMatrixWidth; i++) {
+    for (int j = 0; i < kMatrixHeight; i++) {
+      if (matrix2D[i][j] == 1) {
+      leds[XY(i,j)] = CRGB::White;
+      } else {
+        leds[XY(i,j)] = CRGB::Black;
+      }
+    }
+  }
+}
+
+//Takes board 1 or 2 and LEFT or RIGHT
+void moveBoard(int board, int dir) {
+  int tempBoard[7] = {0}; //create empty 7-point array
+
+  if (board == 1) {
+    if (dir == LEFT) {
+      if (board1[0] != 1) { //detect if the board is not at max left value already
+        for (int i = 0; i < kMatrixWidth; i++) {
+          if (board1[i] == 1) tempBoard[i-1] = 1; //Shift all 1's to the left
+        }
+      }
+
+    } else {
+      if (board1[kMatrixWidth-1] != 1) { //detect if the board is not at max right value already
+        for (int i = 0; i < kMatrixWidth; i++) {
+          if (board1[i] == 1) tempBoard[i+1] = 1; //Shift all 1's to the right
+        }
+      }
+    }
+    
+    memcpy(tempBoard, board1, sizeof tempBoard); //Does this really safely copy array1 to array2?
+
+  } else if (board == 2) {
+    if (dir == LEFT) {
+      if (board1[0] != 1) { //detect if the board is not at max left value already
+        for (int i = 0; i < kMatrixWidth; i++) {
+          if (board1[i] == 1) tempBoard[i-1] = 1; //Shift all 1's to the left
+        }
+      }
+
+    } else {
+      if (board1[kMatrixWidth-1] != 1) { //detect if the board is not at max right value already
+        for (int i = 0; i < kMatrixWidth; i++) {
+          if (board1[i] == 1) tempBoard[i+1] = 1; //Shift all 1's to the right
+        }
+      }
+    }
+    
+    memcpy(tempBoard, board1, sizeof tempBoard); //Does this really safely copy array1 to array2?
+  }
 }
 
 void handleInput() {
   btn_left_state = digitalRead(BTN_LEFT);
   btn_right_state = digitalRead(BTN_RIGHT);
 
-  if (btn_left_state == 1 && ballPos > 0) {
-    ballPos--;
+  //This if block has to be duplicated for the other player
+  //With 2 individual buttons
+  if (btn_left_state == 1) {
+    moveBoard(1, LEFT);
     Serial.println("left button pressed");
-  } else if (btn_right_state == 1 && ballPos < NUM_LEDS) {
-    ballPos++;
+  } else if (btn_right_state == 1) {
+    moveBoard(1, RIGHT);
     Serial.println("right button pressed");
   }
 }

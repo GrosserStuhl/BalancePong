@@ -32,8 +32,6 @@ const uint8_t kMatrixHeight = 7;
 const bool kMatrixSerpentineLayout = true;
 
 CRGB leds[NUM_LEDS];
-int matrix[5];
-int ballPos = 0;
 
 /* Matrix layout:
 Start ->
@@ -47,7 +45,7 @@ Start ->
               -> End
 */
 
-int matrix2D[7][7] = {
+byte matrix[7][7] = {
   {1, 1, 1, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0},
@@ -57,10 +55,18 @@ int matrix2D[7][7] = {
   {0, 0, 0, 0, 1, 1, 1}
 };
 
-int board1[7] = {1, 1, 1, 0, 0, 0, 0};
-int board2[7] = {0, 0, 0, 0, 1, 1, 1};
+byte board1[7] = {1, 1, 1, 0, 0, 0, 0};
+byte board2[7] = {0, 0, 0, 0, 1, 1, 1};
 //Position as {x, y}
-int ballPos2D[2] = {2, 3};
+byte ballPos2D[2] = {2, 3};
+//Direction on the board
+byte ballXDir = 1;
+byte ballYDir = 1;
+byte ballSpeed = 1;
+
+byte player1Score = 0;
+byte player2Score = 0;
+
 
 //== FastLED Methods ==
 uint16_t XY(uint8_t x, uint8_t y)
@@ -134,25 +140,23 @@ void setup()
   // initialize LED digital pin as an output.
   // pinMode(LED_BUILTIN, OUTPUT);
 
-  pinMode(BTN_LEFT, INPUT);
-  pinMode(BTN_RIGHT, INPUT);
+  // pinMode(BTN_LEFT, INPUT);
+  // pinMode(BTN_RIGHT, INPUT);
 
-  FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
-
-  for (int i = 0; i < NUM_LEDS; i++) {
-    matrix[i] = 0;
-  }
+  // FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  // FastLED.setBrightness(BRIGHTNESS);
 }
 
 void loop() {
 
   handleInput();
   resetMatrix();
-  matrix[ballPos] = 1;
-  convertMatrixToLEDs();
-  FastLED.show();
-  Serial.println(ballPos);
+  updateMatrix();
+
+  //TODO: Print to Serial in a nice way
+
+  // convertMatrixToLEDs();
+  // FastLED.show();
   delay(200);
 
 //    doCrazyShit();
@@ -161,36 +165,31 @@ void loop() {
 //  FastLED.show();
 }
 
-void updateMatrix2D() {
-  resetMatrix2D();
+void updateMatrix() {
+  resetmatrix();
 
   for (int x = 0; x < kMatrixWidth; x++) {
     //Run through the first row of the matrix and apply board1
-    matrix2D[0][x] = board1[x];  
+    matrix[0][x] = board1[x];  
   }
   for (int x = 0; x < kMatrixWidth; x++) {
     //Run through the last row of the matrix and apply board2
-    matrix2D[kMatrixHeight-1][x] = board2[x];  
+    matrix[kMatrixHeight-1][x] = board2[x];  
   }
 
-  matrix2D[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
+  matrix[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
 }
 
 void resetMatrix() {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    matrix[i] = 0;
-  }
-}
-void resetMatrix2D() {
   for (int i = 0; i < kMatrixWidth; i++) {
     for (int j = 0; i < kMatrixHeight; i++) {
-      matrix2D[i][j] = 0;
+      matrix[i][j] = 0;
     }
   }
 
 //OR
 
-  for(auto& rows: matrix2D){
+  for(auto& rows: matrix){
     for(auto& elem: rows){
         elem = 0;
     }
@@ -198,27 +197,9 @@ void resetMatrix2D() {
 }
 
 void convertMatrixToLEDs() {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    if (matrix[i] == 1) {
-      leds[i] = CRGB::Red;
-    } else {
-      leds[i] = CRGB::Black;
-    }
-  }
-
-  // Serial.println("==LED Array==");
-  // for (int i = 0; i < NUM_LEDS; i++) {
-  //   Serial.print("leds["); 
-  //   Serial.print(i);
-  //   Serial.print("] = ");
-  //   Serial.println(leds[i]);
-  // }
-}
-
-void convertMatrix2DToLEDs() {
   for (int i = 0; i < kMatrixWidth; i++) {
     for (int j = 0; i < kMatrixHeight; i++) {
-      if (matrix2D[i][j] == 1) {
+      if (matrix[i][j] == 1) {
       leds[XY(i,j)] = CRGB::White;
       } else {
         leds[XY(i,j)] = CRGB::Black;
@@ -227,8 +208,40 @@ void convertMatrix2DToLEDs() {
   }
 }
 
+void moveBall() {
+  //Check horizontal bounds first
+  if(ballPos2D[0]==kMatrixWidth-1 && ballXDir > 0) { //going right ->
+      ballXDir = -ballXDir;
+  } else if (ballPos2D[0]==0 && ballXDir < 0) {//going left <-
+      ballXDir = -ballXDir;
+  }
+
+  //Check against board bounds
+  //Against P1's board
+  if (ballPos2D[1] == 1 && ballYDir < 0 && ballPos2D[0] == ) {
+    
+  }
+
+  //Check if scored
+  if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
+    player2Score ++;
+    resetBallPos();
+
+  } else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
+    player1Score ++;
+    resetBallPos();
+  }
+}
+
+//Reset to center + mirror direction
+void resetBallPos() {
+  ballPos2D[0] = kMatrixWidth/2;
+  ballPos2D[1] = kMatrixHeight/2;
+  ballYDir = -ballYDir;
+}
+
 //Takes board 1 or 2 and LEFT or RIGHT
-void moveBoard(int board, int dir) {
+void moveBoard(int board, byte dir) {
   int tempBoard[7] = {0}; //create empty 7-point array
 
   if (board == 1) {

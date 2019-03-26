@@ -1,10 +1,10 @@
 
 #include "Arduino.h"
-#include <FastLED.h>
+// #include <FastLED.h>
 
+//LED params
 #define NUM_LEDS 49
 
-// Data pin that led data will be written out over
 #define DATA_PIN 3
 
 #define COLOR_ORDER GRB
@@ -31,7 +31,7 @@ const uint8_t kMatrixHeight = 7;
 // Param for different pixel layouts
 const bool kMatrixSerpentineLayout = true;
 
-CRGB leds[NUM_LEDS];
+// CRGB leds[NUM_LEDS];
 
 /* Matrix layout:
 Start ->
@@ -55,13 +55,21 @@ byte matrix[7][7] = {
   {0, 0, 0, 0, 1, 1, 1}
 };
 
+//Save boards as one row of matrix
 byte board1[7] = {1, 1, 1, 0, 0, 0, 0};
 byte board2[7] = {0, 0, 0, 0, 1, 1, 1};
+//OR save them as starting byte + WIDTH
+byte b1Start = 0;
+byte b2Start = kMatrixWidth / 2;
+
+//Board width as constant
+const byte B_WIDTH = 3;
+
 //Position as {x, y}
-byte ballPos2D[2] = {2, 3};
+int ballPos2D[2] = {2, 3};
 //Direction on the board
-byte ballXDir = 1;
-byte ballYDir = 1;
+int ballXDir = 1;
+int ballYDir = 1;
 byte ballSpeed = 1;
 
 byte player1Score = 0;
@@ -96,96 +104,46 @@ uint16_t XY(uint8_t x, uint8_t y)
   return i;
 }
 
-void DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xHueDelta8)
-{
-  byte lineStartHue = startHue8;
-  for (byte y = 0; y < kMatrixHeight; y++)
-  {
-    lineStartHue += yHueDelta8;
-    byte pixelHue = lineStartHue;
-    for (byte x = 0; x < kMatrixWidth; x++)
-    {
-      pixelHue += xHueDelta8;
-      leds[XY(x, y)] = CHSV(pixelHue, 255, 255);
-    }
-  }
-}
+// void DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xHueDelta8)
+// {
+//   byte lineStartHue = startHue8;
+//   for (byte y = 0; y < kMatrixHeight; y++)
+//   {
+//     lineStartHue += yHueDelta8;
+//     byte pixelHue = lineStartHue;
+//     for (byte x = 0; x < kMatrixWidth; x++)
+//     {
+//       pixelHue += xHueDelta8;
+//       leds[XY(x, y)] = CHSV(pixelHue, 255, 255);
+//     }
+//   }
+// }
 
-void doCrazyShit()
-{
-  uint32_t ms = millis();
-  int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / kMatrixWidth));
-  int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / kMatrixHeight));
-  DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
-  if (ms < 5000)
-  {
-    FastLED.setBrightness(scale8(BRIGHTNESS, (ms * 256) / 5000));
-  }
-  else
-  {
-    FastLED.setBrightness(BRIGHTNESS);
-  }
-  FastLED.show();
-}
+// void doCrazyShit()
+// {
+//   uint32_t ms = millis();
+//   int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / kMatrixWidth));
+//   int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / kMatrixHeight));
+//   DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
+//   if (ms < 5000)
+//   {
+//     FastLED.setBrightness(scale8(BRIGHTNESS, (ms * 256) / 5000));
+//   }
+//   else
+//   {
+//     FastLED.setBrightness(BRIGHTNESS);
+//   }
+//   FastLED.show();
+// }
 
-//== Normal Arduino Code ==
-
-void setup()
-{
-  //sanity delay
-  delay(2000);
-
-  Serial.begin(9600);
-
-  // initialize LED digital pin as an output.
-  // pinMode(LED_BUILTIN, OUTPUT);
-
-  // pinMode(BTN_LEFT, INPUT);
-  // pinMode(BTN_RIGHT, INPUT);
-
-  // FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  // FastLED.setBrightness(BRIGHTNESS);
-}
-
-void loop() {
-
-  handleInput();
-  resetMatrix();
-  updateMatrix();
-
-  //TODO: Print to Serial in a nice way
-
-  // convertMatrixToLEDs();
-  // FastLED.show();
-  delay(200);
-
-//    doCrazyShit();
-
-//  leds[ XY( 4, 0) ] = CHSV( random8(), 255, 255);
-//  FastLED.show();
-}
-
-void updateMatrix() {
-  resetmatrix();
-
-  for (int x = 0; x < kMatrixWidth; x++) {
-    //Run through the first row of the matrix and apply board1
-    matrix[0][x] = board1[x];  
-  }
-  for (int x = 0; x < kMatrixWidth; x++) {
-    //Run through the last row of the matrix and apply board2
-    matrix[kMatrixHeight-1][x] = board2[x];  
-  }
-
-  matrix[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
-}
+//== Game Code ==
 
 void resetMatrix() {
-  for (int i = 0; i < kMatrixWidth; i++) {
-    for (int j = 0; i < kMatrixHeight; i++) {
-      matrix[i][j] = 0;
-    }
-  }
+  // for (int i = 0; i < kMatrixWidth; i++) {
+  //   for (int j = 0; i < kMatrixHeight; i++) {
+  //     matrix[i][j] = 0;
+  //   }
+  // }
 
 //OR
 
@@ -196,42 +154,43 @@ void resetMatrix() {
   }
 }
 
-void convertMatrixToLEDs() {
-  for (int i = 0; i < kMatrixWidth; i++) {
-    for (int j = 0; i < kMatrixHeight; i++) {
-      if (matrix[i][j] == 1) {
-      leds[XY(i,j)] = CRGB::White;
-      } else {
-        leds[XY(i,j)] = CRGB::Black;
-      }
-    }
+void updateMatrix() {
+  resetMatrix();
+
+  // for (int x = 0; x < kMatrixWidth; x++) {
+  //   //Run through the first row of the matrix and apply board1
+  //   matrix[0][x] = board1[x];  
+  // }
+  // for (int x = 0; x < kMatrixWidth; x++) {
+  //   //Run through the last row of the matrix and apply board2
+  //   matrix[kMatrixHeight-1][x] = board2[x];  
+  // }
+
+//====OR====
+
+  //With WIDTH method:
+  for (int i = b1Start; i < b1Start + B_WIDTH; i++){
+    matrix[0][i] = 1;
   }
+  for (int i = b2Start; i < b2Start + B_WIDTH; i++){
+    matrix[kMatrixHeight - 1][i] = 1;
+  }
+
+  matrix[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
 }
 
-void moveBall() {
-  //Check horizontal bounds first
-  if(ballPos2D[0]==kMatrixWidth-1 && ballXDir > 0) { //going right ->
-      ballXDir = -ballXDir;
-  } else if (ballPos2D[0]==0 && ballXDir < 0) {//going left <-
-      ballXDir = -ballXDir;
-  }
 
-  //Check against board bounds
-  //Against P1's board
-  if (ballPos2D[1] == 1 && ballYDir < 0 && ballPos2D[0] == ) {
-    
-  }
-
-  //Check if scored
-  if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
-    player2Score ++;
-    resetBallPos();
-
-  } else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
-    player1Score ++;
-    resetBallPos();
-  }
-}
+// void convertMatrixToLEDs() {
+//   for (int i = 0; i < kMatrixWidth; i++) {
+//     for (int j = 0; i < kMatrixHeight; i++) {
+//       if (matrix[i][j] == 1) {
+//       leds[XY(i,j)] = CRGB::White;
+//       } else {
+//         leds[XY(i,j)] = CRGB::Black;
+//       }
+//     }
+//   }
+// }
 
 //Reset to center + mirror direction
 void resetBallPos() {
@@ -239,6 +198,57 @@ void resetBallPos() {
   ballPos2D[1] = kMatrixHeight/2;
   ballYDir = -ballYDir;
 }
+
+void moveBall() {
+  //Check horizontal bounds first
+  if(ballPos2D[0]==kMatrixWidth-1 && ballXDir > 0) { //going right ->
+    ballXDir = -ballXDir;
+    Serial.println("Hit RIGHT wall, ball dirX mirrored.");
+    Serial.println();
+  } else if (ballPos2D[0]==0 && ballXDir < 0) {//going left <-
+      ballXDir = -ballXDir;
+      Serial.println("Hit LEFT wall, ball dirX mirrored.");
+      Serial.println();
+  }
+
+  //Check against board bounds
+  //Check if ball on row directly before board && going towards player
+  //+  if ball pixel is inside the board bounds
+  //Player1
+  else if (ballPos2D[1] == 1 && ballYDir < 0 
+      && ballPos2D[0] >=  b1Start && ballPos2D[0] <= b1Start + B_WIDTH) {
+    ballXDir = -ballXDir;
+    ballYDir = -ballYDir;
+    Serial.println("Ball blocked by P1");
+    Serial.println();
+  } 
+  //Player2
+  else if (ballPos2D[1] == kMatrixHeight-2 && ballYDir > 0  
+      && ballPos2D[0] >=  b2Start && ballPos2D[0] <= b2Start + B_WIDTH) {
+    ballXDir = -ballXDir;
+    ballYDir = -ballYDir;
+    Serial.println("Ball blocked by P2");
+    Serial.println();
+  }
+
+  //Check if scored --> reset ballPos
+  else if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
+    player2Score ++;
+    resetBallPos();
+    Serial.println("===> Scored goal against P1");
+  }
+  else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
+    player1Score ++;
+    resetBallPos();
+    Serial.println("===> Scored goal against P2");
+  }
+  //If none of the above cases, move ball normally
+  else {
+    ballPos2D[0] += ballXDir;
+    ballPos2D[1] += ballYDir;
+  }
+}
+
 
 //Takes board 1 or 2 and LEFT or RIGHT
 void moveBoard(int board, byte dir) {
@@ -295,4 +305,70 @@ void handleInput() {
     moveBoard(1, RIGHT);
     Serial.println("right button pressed");
   }
+}
+
+//== Serial matrix print ==
+void printOutMatrix() {
+  byte i = 0;
+  Serial.println("===MATRIX===");
+  for(auto& rows: matrix){
+        Serial.print("Row ");
+        Serial.print(i);
+        Serial.print(": ");
+    for(auto& elem: rows){
+        Serial.print(elem);
+        Serial.print(",");
+    }
+    i++;
+    Serial.println();
+  }
+  
+  Serial.println("===BALL==");
+  Serial.print("DirX: ");
+  Serial.println(ballXDir);
+  Serial.print("DirY: ");
+  Serial.println(ballYDir);
+  Serial.print("BallPosX: ");
+  Serial.println(ballPos2D[0]);
+  Serial.print("BallPosY: ");
+  Serial.println(ballPos2D[1]);
+
+  Serial.println();
+}
+
+//== Arduino Methods ==
+
+void setup()
+{
+  //sanity delay
+  delay(2000);
+
+  Serial.begin(9600);
+
+  // initialize LED digital pin as an output.
+  // pinMode(LED_BUILTIN, OUTPUT);
+
+  // pinMode(BTN_LEFT, INPUT);
+  // pinMode(BTN_RIGHT, INPUT);
+
+  // FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  // FastLED.setBrightness(BRIGHTNESS);
+}
+
+void loop() {
+
+  handleInput();
+  moveBall();
+  updateMatrix();
+
+  printOutMatrix();
+
+  // convertMatrixToLEDs();
+  // FastLED.show();
+  delay(3000);
+
+//    doCrazyShit();
+
+//  leds[ XY( 4, 0) ] = CHSV( random8(), 255, 255);
+//  FastLED.show();
 }

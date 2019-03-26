@@ -7,10 +7,4 @@
 
 \.travis\.yml 
  
-\.vscode/extensions\.json 
- 
-\.vscode/ipch/576983ebd5ae2236/MAIN\.ipch 
- 
-\.vscode/ipch/576983ebd5ae2236/mmap_address\.bin 
- 
-\.vscode/settings\.json 
+\.vscode/

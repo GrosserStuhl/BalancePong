@@ -74,6 +74,7 @@ byte ballSpeed = 1;
 
 byte player1Score = 0;
 byte player2Score = 0;
+bool scoredHit = false;
 
 
 //== FastLED Methods ==
@@ -154,21 +155,17 @@ void resetMatrix() {
   }
 }
 
+//Reset to center + mirror direction
+void resetBallPos() {
+  ballPos2D[0] = kMatrixWidth/2;
+  ballPos2D[1] = kMatrixHeight/2;
+  ballYDir = -ballYDir;
+}
+
 void updateMatrix() {
   resetMatrix();
 
-  // for (int x = 0; x < kMatrixWidth; x++) {
-  //   //Run through the first row of the matrix and apply board1
-  //   matrix[0][x] = board1[x];  
-  // }
-  // for (int x = 0; x < kMatrixWidth; x++) {
-  //   //Run through the last row of the matrix and apply board2
-  //   matrix[kMatrixHeight-1][x] = board2[x];  
-  // }
-
-//====OR====
-
-  //With WIDTH method:
+  //Draw boards
   for (int i = b1Start; i < b1Start + B_WIDTH; i++){
     matrix[0][i] = 1;
   }
@@ -176,7 +173,17 @@ void updateMatrix() {
     matrix[kMatrixHeight - 1][i] = 1;
   }
 
-  matrix[ballPos2D[1]][ballPos2D[0]] = 1; //set ball pixel, first Y then X (cuz of 2D array logic)
+  //Draw ball pixel
+  matrix[ballPos2D[1]][ballPos2D[0]] = 1; //first Y then X (cuz of 2D array logic)
+
+  //For better visualization of ball reaching last row
+  //Only reset postion AFTER the last pos was drawn
+  //Else it's reset before being visible on last row
+  if (scoredHit) {
+    resetBallPos();
+    scoredHit = false;
+    delay(5000);
+  }
 }
 
 
@@ -191,13 +198,6 @@ void updateMatrix() {
 //     }
 //   }
 // }
-
-//Reset to center + mirror direction
-void resetBallPos() {
-  ballPos2D[0] = kMatrixWidth/2;
-  ballPos2D[1] = kMatrixHeight/2;
-  ballYDir = -ballYDir;
-}
 
 void runValidation() {
   //Check horizontal bounds first
@@ -234,15 +234,13 @@ void runValidation() {
   //Check if scored --> reset ballPos
   if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
     player2Score ++;
-    resetBallPos();
+    scoredHit = true;
     Serial.println("===> Scored goal against P1");
-    delay(5000);
   }
   else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
     player1Score ++;
-    resetBallPos();
+    scoredHit = true;
     Serial.println("===> Scored goal against P2");
-    delay(5000);
   }
 }
 

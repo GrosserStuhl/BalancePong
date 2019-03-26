@@ -199,7 +199,7 @@ void resetBallPos() {
   ballYDir = -ballYDir;
 }
 
-void moveBall() {
+void runValidation() {
   //Check horizontal bounds first
   if(ballPos2D[0]==kMatrixWidth-1 && ballXDir > 0) { //going right ->
     ballXDir = -ballXDir;
@@ -231,8 +231,17 @@ void moveBall() {
     Serial.println();
   }
 
+}
+
+void moveBall() {
+  runValidation();
+
+  //Update position
+  ballPos2D[0] += ballXDir;
+  ballPos2D[1] += ballYDir;
+
   //Check if scored --> reset ballPos
-  else if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
+  if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
     player2Score ++;
     resetBallPos();
     Serial.println("===> Scored goal against P1");
@@ -242,11 +251,7 @@ void moveBall() {
     resetBallPos();
     Serial.println("===> Scored goal against P2");
   }
-  //If none of the above cases, move ball normally
-  else {
-    ballPos2D[0] += ballXDir;
-    ballPos2D[1] += ballYDir;
-  }
+  
 }
 
 
@@ -356,6 +361,8 @@ void setup()
 }
 
 void loop() {
+
+  Serial.println("===== New Round =====");
 
   handleInput();
   moveBall();

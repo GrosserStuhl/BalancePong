@@ -45,7 +45,7 @@ Start ->
               -> End
 */
 
-byte matrix[7][7] = {
+int matrix[7][7] = {
   {1, 1, 1, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0, 0},
@@ -59,8 +59,8 @@ byte matrix[7][7] = {
 byte board1[7] = {1, 1, 1, 0, 0, 0, 0};
 byte board2[7] = {0, 0, 0, 0, 1, 1, 1};
 //OR save them as starting byte + WIDTH
-byte b1Start = 0;
-byte b2Start = kMatrixWidth / 2;
+byte b1Start = kMatrixWidth / 2 - 1;
+byte b2Start = kMatrixWidth / 2 - 1;
 
 //Board width as constant
 const byte B_WIDTH = 3;
@@ -176,7 +176,7 @@ void updateMatrix() {
     matrix[kMatrixHeight - 1][i] = 1;
   }
 
-  matrix[ballPos2D[0]][ballPos2D[1]] = 1; //set ball pixel
+  matrix[ballPos2D[1]][ballPos2D[0]] = 1; //set ball pixel, first Y then X (cuz of 2D array logic)
 }
 
 
@@ -216,42 +216,42 @@ void runValidation() {
   //+  if ball pixel is inside the board bounds
   //Player1
   else if (ballPos2D[1] == 1 && ballYDir < 0 
-      && ballPos2D[0] >=  b1Start && ballPos2D[0] <= b1Start + B_WIDTH) {
-    ballXDir = -ballXDir;
+      && ballPos2D[0] >=  b1Start && ballPos2D[0] <= b1Start + B_WIDTH - 1) {
+    // ballXDir = -ballXDir;
     ballYDir = -ballYDir;
     Serial.println("Ball blocked by P1");
     Serial.println();
   } 
   //Player2
   else if (ballPos2D[1] == kMatrixHeight-2 && ballYDir > 0  
-      && ballPos2D[0] >=  b2Start && ballPos2D[0] <= b2Start + B_WIDTH) {
-    ballXDir = -ballXDir;
+      && ballPos2D[0] >=  b2Start && ballPos2D[0] <= b2Start + B_WIDTH - 1) {
+    // ballXDir = -ballXDir;
     ballYDir = -ballYDir;
     Serial.println("Ball blocked by P2");
     Serial.println();
   }
-
-}
-
-void moveBall() {
-  runValidation();
-
-  //Update position
-  ballPos2D[0] += ballXDir;
-  ballPos2D[1] += ballYDir;
 
   //Check if scored --> reset ballPos
   if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
     player2Score ++;
     resetBallPos();
     Serial.println("===> Scored goal against P1");
+    delay(5000);
   }
   else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
     player1Score ++;
     resetBallPos();
     Serial.println("===> Scored goal against P2");
+    delay(5000);
   }
-  
+}
+
+void moveBall() {
+  //Update position
+  ballPos2D[0] += ballXDir;
+  ballPos2D[1] += ballYDir;
+
+  runValidation();
 }
 
 
@@ -362,7 +362,7 @@ void setup()
 
 void loop() {
 
-  Serial.println("===== New Round =====");
+  Serial.println("===== New Frame =====");
 
   handleInput();
   moveBall();

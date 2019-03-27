@@ -319,10 +319,10 @@ void handleInput() {
   //P1
   if (btn_P1_left_state == 1) {
     moveBoard(1, LEFT);
-    Serial.println("### left button pressed");
+    Serial.println("### P1 left button pressed");
   } else if (btn_P1_right_state == 1) {
     moveBoard(1, RIGHT);
-    Serial.println("### right button pressed");
+    Serial.println("### P1 right button pressed");
   }
 
   //Make separate IFs, so players don't block each other
@@ -330,10 +330,10 @@ void handleInput() {
   //P2
   if (btn_P2_left_state == 1) {
     moveBoard(2, LEFT);
-    Serial.println("### left button pressed");
+    Serial.println("### P2 left button pressed");
   } else if (btn_P2_right_state == 1) {
     moveBoard(2, RIGHT);
-    Serial.println("### right button pressed");
+    Serial.println("### P2 right button pressed");
   }
 }
 

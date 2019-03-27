@@ -13,16 +13,22 @@
 #define BRIGHTNESS 20
 
 //Buttons
-#define BTN_LEFT 4
-#define BTN_RIGHT 5
+#define BTN_P1_LEFT 4
+#define BTN_P1_RIGHT 5
+
+#define BTN_P2_LEFT 6
+#define BTN_P2_RIGHT 7
 
 //Direction for boards
 #define LEFT 0
 #define RIGHT 1
 
 //Params for buttons
-int btn_left_state = 0;
-int btn_right_state = 0;
+int btn_P1_left_state = 0;
+int btn_P1_right_state = 0;
+
+int btn_P2_left_state = 0;
+int btn_P2_right_state = 0;
 
 // Params for width and height
 const uint8_t kMatrixWidth = 7;
@@ -302,16 +308,31 @@ void moveBoard(int board, byte dir) {
 }
 
 void handleInput() {
-  btn_left_state = digitalRead(BTN_LEFT);
-  btn_right_state = digitalRead(BTN_RIGHT);
+  //Player 1
+  btn_P1_left_state = digitalRead(BTN_P1_LEFT);
+  btn_P1_right_state = digitalRead(BTN_P1_RIGHT);
 
-  //This if block has to be duplicated for the other player
-  //With 2 individual buttons
-  if (btn_left_state == 1) {
+  //Player 2
+  btn_P2_left_state = digitalRead(BTN_P2_LEFT);
+  btn_P2_right_state = digitalRead(BTN_P2_RIGHT);
+
+  //P1
+  if (btn_P1_left_state == 1) {
     moveBoard(1, LEFT);
     Serial.println("### left button pressed");
-  } else if (btn_right_state == 1) {
+  } else if (btn_P1_right_state == 1) {
     moveBoard(1, RIGHT);
+    Serial.println("### right button pressed");
+  }
+
+  //Make separate IFs, so players don't block each other
+
+  //P2
+  if (btn_P2_left_state == 1) {
+    moveBoard(2, LEFT);
+    Serial.println("### left button pressed");
+  } else if (btn_P2_right_state == 1) {
+    moveBoard(2, RIGHT);
     Serial.println("### right button pressed");
   }
 }

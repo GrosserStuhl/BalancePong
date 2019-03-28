@@ -1,9 +1,10 @@
 
 #include "Arduino.h"
 #include <FastLED.h>
+#include <Wire.h> // This library allows you to communicate with I2C devices.
 
-//LED params
-#define NUM_LEDS 49
+//====== LED Params ======
+#define NUM_LEDS 198
 
 #define DATA_PIN 3
 
@@ -12,16 +13,23 @@
 
 #define BRIGHTNESS 20
 
-//Buttons
-#define BTN_P1_LEFT 4
-#define BTN_P1_RIGHT 5
-
-#define BTN_P2_LEFT 6
-#define BTN_P2_RIGHT 7
-
+//====== Input Params ======
 //Direction for boards
 #define LEFT 0
 #define RIGHT 1
+
+const int p1_left_threshhold = 3000;
+const int p1_right_threshhold = -3000;
+
+const int p2_left_threshhold = 3000;
+const int p2_right_threshhold = -3000;
+
+// //Buttons
+// #define BTN_P1_LEFT 4
+// #define BTN_P1_RIGHT 5
+
+// #define BTN_P2_LEFT 6
+// #define BTN_P2_RIGHT 7
 
 //Params for buttons
 int btn_P1_left_state = 0;
@@ -30,17 +38,23 @@ int btn_P1_right_state = 0;
 int btn_P2_left_state = 0;
 int btn_P2_right_state = 0;
 
-// Params for width and height
-const uint8_t kMatrixWidth = 7;
-const uint8_t kMatrixHeight = 7;
+//====== FastLED Library Params ======
+//Params for width and height used by the library
+//But because of our own LED matrix structure: 
+const uint8_t kMatrixWidth = 18; //This is actually height
+const uint8_t kMatrixHeight = 11; //And this width
 
 // Param for different pixel layouts
-const bool kMatrixSerpentineLayout = true;
+//Our layout is not a snake, so it's false
+const bool kMatrixSerpentineLayout = false;
 
 CRGB leds[NUM_LEDS];
 
+//====== Matrix Data ======
+uint8_t matrix[kMatrixWidth][kMatrixHeight] = {0};
+
 /* Matrix layout:
-Start ->
+Start (first down, then right)
 {0, 0, 1, 1, 1, 0, 0}  --> Board 1
   0, 0, 0, 0, 0, 0, 0
   0, 0, 0, 0, 0, 0, 0
@@ -48,42 +62,62 @@ Start ->
   0, 0, 0, 0, 0, 0, 0
   0, 0, 0, 0, 0, 0, 0
 {0, 0, 1, 1, 1, 0, 0}  --> Board 2
-              -> End
+              End
 */
 
-int matrix[7][7] = {
-  {1, 1, 1, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0, 0, 0},
-  {0, 0, 1, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0, 0, 0},
-  {0, 0, 0, 0, 0, 0, 0},
-  {0, 0, 0, 0, 1, 1, 1}
-};
-
-//Save boards as one row of matrix
-// byte board1[7] = {1, 1, 1, 0, 0, 0, 0};
-// byte board2[7] = {0, 0, 0, 0, 1, 1, 1};
-//OR save them as starting byte + WIDTH
-byte b1Start = kMatrixWidth / 2 - 1;
-byte b2Start = kMatrixWidth / 2 - 1;
+//====== Player Board Data ======
+//Save boards as starting int + WIDTH
+uint8_t b1Start = 0;
+uint8_t b2Start = kMatrixHeight / 2 - 1;
 
 //Board width as constant
-const byte B_WIDTH = 3;
+const uint8_t B_WIDTH = 3;
 
+uint8_t player1Score = 0;
+uint8_t player2Score = 0;
+bool scoredHit = false;
+
+bool p1_holding_left = false;
+bool p1_holding_right = false;
+
+bool p2_holding_left = false;
+bool p2_holding_right = false;
+
+//====== Ball Data ======
 //Position as {x, y}
 int ballPos2D[2] = {2, 3};
 //Direction on the board
 int ballXDir = 1;
 int ballYDir = 1;
-byte ballSpeed = 1;
-
-byte player1Score = 0;
-byte player2Score = 0;
-bool scoredHit = false;
+uint8_t ballSpeed = 1;
 
 
-//== FastLED Methods ==
+
+//====== Gyro Params ======
+const int MPU_ADDR = 0x68; // I2C address of the MPU-6050. If AD0 pin is set to HIGH, the I2C address will be 0x69.
+const int MPU_ADDR2 = 0x69;
+
+int16_t accelerometer_x, accelerometer_y, accelerometer_z; // variables for accelerometer raw data
+int16_t gyro_x, gyro_y, gyro_z; // variables for gyro raw data
+int16_t temperature; // variables for temperature data
+
+
+int16_t accelerometer_x2, accelerometer_y2, accelerometer_z2; // variables for accelerometer raw data
+int16_t gyro_x2, gyro_y2, gyro_z2; // variables for gyro raw data
+int16_t temperature2; // variables for temperature data
+
+char tmp_str[7]; // temporary variable used in convert function
+
+char* convert_int16_to_str(int16_t i) { // converts int16 to string. Moreover, resulting strings will have the same length in the debug monitor.
+  sprintf(tmp_str, "%6d", i);
+  return tmp_str;
+}
+
+#define AD0_PIN 5
+
+
+
+//====== FastLED Methods ======
 uint16_t XY(uint8_t x, uint8_t y)
 {
   uint16_t i;
@@ -143,17 +177,9 @@ void doCrazyShit()
   FastLED.show();
 }
 
-//== Game Code ==
+//====== Game Code ======
 
 void resetMatrix() {
-  // for (int i = 0; i < kMatrixWidth; i++) {
-  //   for (int j = 0; i < kMatrixHeight; i++) {
-  //     matrix[i][j] = 0;
-  //   }
-  // }
-
-//OR
-
   for(auto& rows: matrix){
     for(auto& elem: rows){
         elem = 0;
@@ -163,8 +189,8 @@ void resetMatrix() {
 
 //Reset to center + mirror direction
 void resetBallPos() {
-  ballPos2D[0] = kMatrixWidth/2;
-  ballPos2D[1] = kMatrixHeight/2;
+  ballPos2D[0] = kMatrixHeight/2;
+  ballPos2D[1] = kMatrixWidth/2;
   ballYDir = -ballYDir;
 }
 
@@ -176,7 +202,7 @@ void updateMatrix() {
     matrix[0][i] = 1;
   }
   for (int i = b2Start; i < b2Start + B_WIDTH; i++){
-    matrix[kMatrixHeight - 1][i] = 1;
+    matrix[kMatrixWidth - 1][i] = 1;
   }
 
   //Draw ball pixel
@@ -188,14 +214,14 @@ void updateMatrix() {
   if (scoredHit) {
     resetBallPos();
     scoredHit = false;
-    delay(3000);
+    delay(2000);
   }
 }
 
 
 void convertMatrixToLEDs() {
   for (int i = 0; i < kMatrixWidth; i++) {
-    for (int j = 0; i < kMatrixHeight; i++) {
+    for (int j = 0; j < kMatrixHeight; j++) {
       if (matrix[i][j] == 1) {
       leds[XY(i,j)] = CRGB::White;
       } else {
@@ -207,8 +233,8 @@ void convertMatrixToLEDs() {
 
 void runValidation() {
   //Check horizontal bounds first
-  if(ballPos2D[0]==kMatrixWidth-1 && ballXDir > 0) { //going right ->
-    ballXDir = -ballXDir;
+  if(ballPos2D[0]==kMatrixHeight-1 && ballXDir > 0) { //going right ->
+    ballXDir = -ballXDir; //Make ball "jump" away from wall
     Serial.println("Hit RIGHT wall, ball dirX mirrored.");
     Serial.println();
   } else if (ballPos2D[0]==0 && ballXDir < 0) {//going left <-
@@ -229,7 +255,7 @@ void runValidation() {
     Serial.println();
   } 
   //Player2
-  else if (ballPos2D[1] == kMatrixHeight-2 && ballYDir > 0  
+  else if (ballPos2D[1] == kMatrixWidth-2 && ballYDir > 0  
       && ballPos2D[0] >=  b2Start && ballPos2D[0] <= b2Start + B_WIDTH - 1) {
     // ballXDir = -ballXDir;
     ballYDir = -ballYDir;
@@ -244,7 +270,7 @@ void runValidation() {
     Serial.println("===> Scored goal against P1");
     Serial.print("Player 1 score: "); Serial.println(player1Score);
   }
-  else if (ballPos2D[1] == kMatrixHeight-1 && ballYDir > 0) { //against P2, dir down as safety check
+  else if (ballPos2D[1] == kMatrixWidth-1 && ballYDir > 0) { //against P2, dir down as safety check
     player1Score ++;
     scoredHit = true;
     Serial.println("===> Scored goal against P2");
@@ -261,79 +287,55 @@ void moveBall() {
 }
 
 
-//Takes board 1 or 2 and LEFT or RIGHT
+//Takes board 1 or 2 & LEFT or RIGHT
 void moveBoard(int board, byte dir) {
-  // int tempBoard[7] = {0}; //create empty 7-point array
 
+  //Player 1
   if (board == 1) {
     if (dir == LEFT) {
-      // if (board1[0] != 1) { //detect if the board is not at max left value already
-      //   for (int i = 0; i < kMatrixWidth; i++) {
-      //     if (board1[i] == 1) tempBoard[i-1] = 1; //Shift all 1's to the left
-      //   }
-      // }
-
-      //Width method
       if (b1Start > 0) { //Is board at max left already?
         b1Start--;
       }
     } else {
-      // if (board1[kMatrixWidth-1] != 1) { //detect if the board is not at max right value already
-      //   for (int i = 0; i < kMatrixWidth; i++) {
-      //     if (board1[i] == 1) tempBoard[i+1] = 1; //Shift all 1's to the right
-      //   }
-      // }
-
-      //width method
-      if (b1Start < kMatrixWidth - B_WIDTH) { //Is board at max right?
+      if (b1Start < kMatrixHeight - B_WIDTH) { //Is board at max right?
         b1Start++;
       }
     }
-    
-    // memcpy(tempBoard, board1, sizeof tempBoard); //Does this really safely copy array1 to array2?
-
+  //Player 2  
   } else if (board == 2) {
     if (dir == LEFT) {
-      if (b2Start > 0) { //Is board at max left already?
+      if (b2Start > 0) { //Is board2 at max left already?
         b2Start--;
       }
     } else {
-      if (b2Start < kMatrixWidth - B_WIDTH) { //Is board at max right?
+      if (b2Start < kMatrixHeight - B_WIDTH) { //Is board2 at max right?
         b2Start++;
       }
     }
-    
-    // memcpy(tempBoard, board1, sizeof tempBoard); //Does this really safely copy array1 to array2?
   }
 }
 
 void handleInput() {
-  //Player 1
-  btn_P1_left_state = digitalRead(BTN_P1_LEFT);
-  btn_P1_right_state = digitalRead(BTN_P1_RIGHT);
-
-  //Player 2
-  btn_P2_left_state = digitalRead(BTN_P2_LEFT);
-  btn_P2_right_state = digitalRead(BTN_P2_RIGHT);
-
   //P1
-  if (btn_P1_left_state == 1) {
+  if (p1_holding_left) {
     moveBoard(1, LEFT);
-    Serial.println("### P1 left button pressed");
-  } else if (btn_P1_right_state == 1) {
+    //Here delay neccessary?
+    Serial.println("### P1 holding left");
+  } else if (p1_holding_right) {
     moveBoard(1, RIGHT);
-    Serial.println("### P1 right button pressed");
+    //Here as well
+    Serial.println("### P1 holding right");
   }
 
   //Make separate IFs, so players don't block each other
 
   //P2
-  if (btn_P2_left_state == 1) {
+  if (p2_holding_left) {
     moveBoard(2, LEFT);
-    Serial.println("### P2 left button pressed");
-  } else if (btn_P2_right_state == 1) {
+    Serial.println("### P2 holding left");
+  } else if (p2_holding_right) {
     moveBoard(2, RIGHT);
-    Serial.println("### P2 right button pressed");
+    Serial.println("### P2 holding right");
   }
 }
 
@@ -366,41 +368,132 @@ void printOutMatrix() {
   Serial.println();
 }
 
-//== Arduino Methods ==
+//====== Gyro Methods ======
+
+void setupGyro() {
+  //Setting the AD0 pin of one gyro to high changes his address, so they are differentiable
+  pinMode(AD0_PIN, OUTPUT);
+  digitalWrite(AD0_PIN, HIGH);
+
+  Wire.begin();
+
+  Wire.beginTransmission(MPU_ADDR); // Begins a transmission to the I2C slave (GY-521 board)
+  Wire.write(0x6B); // PWR_MGMT_1 register
+  Wire.write(0); // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
+
+  delay(50);
+
+  Wire.beginTransmission(MPU_ADDR2); // Begins a transmission to the I2C slave (GY-521 board)
+  Wire.write(0x6B); // PWR_MGMT_1 register
+  Wire.write(0); // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
+}
+
+void gyroLoop() {
+  //Player 1's Balance Board
+  Wire.beginTransmission(MPU_ADDR);
+  Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H) [MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2, p.40]
+  Wire.endTransmission(false); // the parameter indicates that the Arduino will send a restart. As a result, the connection is kept active.
+  Wire.requestFrom(MPU_ADDR, 7 * 2, true); // request a total of 7*2=14 registers
+  
+  // "Wire.read()<<8 | Wire.read();" means two registers are read and stored in the same variable
+  accelerometer_x = Wire.read() << 8 | Wire.read(); // reading registers: 0x3B (ACCEL_XOUT_H) and 0x3C (ACCEL_XOUT_L)
+  accelerometer_y = Wire.read() << 8 | Wire.read(); // reading registers: 0x3D (ACCEL_YOUT_H) and 0x3E (ACCEL_YOUT_L)
+  accelerometer_z = Wire.read() << 8 | Wire.read(); // reading registers: 0x3F (ACCEL_ZOUT_H) and 0x40 (ACCEL_ZOUT_L)
+  temperature = Wire.read() << 8 | Wire.read(); // reading registers: 0x41 (TEMP_OUT_H) and 0x42 (TEMP_OUT_L)
+  gyro_x = Wire.read() << 8 | Wire.read(); // reading registers: 0x43 (GYRO_XOUT_H) and 0x44 (GYRO_XOUT_L)
+  gyro_y = Wire.read() << 8 | Wire.read(); // reading registers: 0x45 (GYRO_YOUT_H) and 0x46 (GYRO_YOUT_L)
+  gyro_z = Wire.read() << 8 | Wire.read(); // reading registers: 0x47 (GYRO_ZOUT_H) and 0x48 (GYRO_ZOUT_L)
+
+    // print out data
+  Serial.print("aX = "); Serial.print(convert_int16_to_str(accelerometer_x));
+  Serial.print(" | aY = "); Serial.print(convert_int16_to_str(accelerometer_y));
+  Serial.print(" | aZ = "); Serial.print(convert_int16_to_str(accelerometer_z));
+  // the following equation was taken from the documentation [MPU-6000/MPU-6050 Register Map and Description, p.30]
+  Serial.print(" | tmp = "); Serial.print(temperature / 340.00 + 36.53);
+  Serial.print(" | gX = "); Serial.print(convert_int16_to_str(gyro_x));
+  Serial.print(" | gY = "); Serial.print(convert_int16_to_str(gyro_y));
+  Serial.print(" | gZ = "); Serial.print(convert_int16_to_str(gyro_z));
+  Serial.println();
+
+  delay(50);
+
+  //Player 2's Balance Board
+  Wire.beginTransmission(MPU_ADDR2);
+  Wire.write(0x3B); // starting with register 0x3B (ACCEL_XOUT_H) [MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2, p.40]
+  Wire.endTransmission(false); // the parameter indicates that the Arduino will send a restart. As a result, the connection is kept active.
+  Wire.requestFrom(MPU_ADDR2, 7 * 2, true); // request a total of 7*2=14 registers
+
+  accelerometer_x2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x3B (ACCEL_XOUT_H) and 0x3C (ACCEL_XOUT_L)
+  accelerometer_y2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x3D (ACCEL_YOUT_H) and 0x3E (ACCEL_YOUT_L)
+  accelerometer_z2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x3F (ACCEL_ZOUT_H) and 0x40 (ACCEL_ZOUT_L)
+  temperature2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x41 (TEMP_OUT_H) and 0x42 (TEMP_OUT_L)
+  gyro_x2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x43 (GYRO_XOUT_H) and 0x44 (GYRO_XOUT_L)
+  gyro_y2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x45 (GYRO_YOUT_H) and 0x46 (GYRO_YOUT_L)
+  gyro_z2 = Wire.read() << 8 | Wire.read(); // reading registers: 0x47 (GYRO_ZOUT_H) and 0x48 (GYRO_ZOUT_L)
+
+  // print out data2
+  Serial.print("aX2 = "); Serial.print(convert_int16_to_str(accelerometer_x2));
+  Serial.print(" | aY2 = "); Serial.print(convert_int16_to_str(accelerometer_y2));
+  Serial.print(" | aZ2 = "); Serial.print(convert_int16_to_str(accelerometer_z2));
+  // the following equation was taken from the documentation [MPU-6000/MPU-6050 Register Map and Description, p.30]
+  Serial.print(" | tmp2 = "); Serial.print(temperature2 / 340.00 + 36.53);
+  Serial.print(" | gX2 = "); Serial.print(convert_int16_to_str(gyro_x2));
+  Serial.print(" | gY2 = "); Serial.print(convert_int16_to_str(gyro_y2));
+  Serial.print(" | gZ2 = "); Serial.print(convert_int16_to_str(gyro_z2));
+  Serial.println();
+
+  //Player 1 check
+  if (accelerometer_y < p1_left_threshhold) {
+    p1_holding_left = true;
+    p1_holding_right = false;
+  } else if (accelerometer_y > p1_right_threshhold) {
+    p1_holding_left = false;
+    p1_holding_right = true;
+  } else {
+    p1_holding_left = false;
+    p1_holding_right = false;
+  }
+
+  //Player 2 check
+  if (accelerometer_y2 < p2_left_threshhold) {
+    p2_holding_left = true;
+    p2_holding_right = false;
+  } else if (accelerometer_y2 > p2_right_threshhold) {
+    p2_holding_left = false;
+    p2_holding_right = true;
+  } else {
+    p2_holding_left = false;
+    p2_holding_right = false;
+  }
+}
+
+
+//====== Arduino Methods ======
 
 void setup()
 {
-  //sanity delay
+  //sanity delay for LEDs
   delay(2000);
 
   Serial.begin(9600);
+  setupGyro();
 
-  // initialize LED digital pin as an output.
-  // pinMode(LED_BUILTIN, OUTPUT);
-
-  // pinMode(BTN_LEFT, INPUT);
-  // pinMode(BTN_RIGHT, INPUT);
-
-  // FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  // FastLED.setBrightness(BRIGHTNESS);
+  FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.setBrightness(BRIGHTNESS);
 }
 
 void loop() {
 
   Serial.println("===== New Frame =====");
 
+  gyroLoop();
   handleInput();
   moveBall();
   updateMatrix();
+  convertMatrixToLEDs();
+  FastLED.show();
 
-  printOutMatrix();
-
-  // convertMatrixToLEDs();
-  // FastLED.show();
-  delay(3000);
-
-//    doCrazyShit();
-
-//  leds[ XY( 4, 0) ] = CHSV( random8(), 255, 255);
-//  FastLED.show();
+  delay(500);
 }

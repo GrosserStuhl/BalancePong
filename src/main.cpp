@@ -18,25 +18,13 @@
 #define LEFT 0
 #define RIGHT 1
 
-const int p1_left_threshhold = 3000;
-const int p1_right_threshhold = -3000;
+const uint16_t p1_left_threshhold = 3000;
+const uint16_t p1_right_threshhold = -3000;
 
-const int p2_left_threshhold = 3000;
-const int p2_right_threshhold = -3000;
+const uint16_t p2_left_threshhold = 3000;
+const uint16_t p2_right_threshhold = -3000;
 
-// //Buttons
-// #define BTN_P1_LEFT 4
-// #define BTN_P1_RIGHT 5
 
-// #define BTN_P2_LEFT 6
-// #define BTN_P2_RIGHT 7
-
-//Params for buttons
-int btn_P1_left_state = 0;
-int btn_P1_right_state = 0;
-
-int btn_P2_left_state = 0;
-int btn_P2_right_state = 0;
 
 //====== FastLED Library Params ======
 //Params for width and height used by the library

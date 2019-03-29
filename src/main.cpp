@@ -4,25 +4,49 @@
 #include <Wire.h> // This library allows you to communicate with I2C devices.
 
 //====== LED Params ======
+//== Matrix ==
 #define NUM_LEDS 198
+#define DATA_PIN 4
 
-#define DATA_PIN 3
+//== Scores ==
+#define NUM_LEDS_SCORE 9
+#define DATA_PIN_SCORE_P1 5
+#define DATA_PIN_SCORE_P2 6
+
+//== General ==
 
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
 
-#define BRIGHTNESS 20
+#define BRIGHTNESS 60
+
+//====== Gyro Pin to Change I2C Address ======
+#define AD0_PIN 3
 
 //====== Input Params ======
 //Direction for boards
 #define LEFT 0
 #define RIGHT 1
 
-const uint16_t p1_left_threshhold = 3000;
-const uint16_t p1_right_threshhold = -3000;
+//=== Gyro Average Y-Value Distribution ===
 
-const uint16_t p2_left_threshhold = 3000;
-const uint16_t p2_right_threshhold = -3000;
+//Values in resting position:
+//p1: y1 = -800 ~ -1400
+//p2: y2 = 900 ~ 1600
+
+//Max values P1:
+//Left: y1 = -7000 ~ -7800
+//Right: y1 = 4500 ~ 5000
+
+//Max values P2:
+//Left: y2 = -6000 ~ -6300
+//Right: y2 = 6000 ~ 6700
+
+const int16_t p1_left_threshold = -3400;
+const int16_t p1_right_threshold = 2500;
+
+const int16_t p2_left_threshold = -3000;
+const int16_t p2_right_threshold = 3300;
 
 
 
@@ -36,7 +60,12 @@ const uint8_t kMatrixHeight = 11; //And this width
 //Our layout is not a snake, so it's false
 const bool kMatrixSerpentineLayout = false;
 
+//Matrix LEDs
 CRGB leds[NUM_LEDS];
+
+//Score LEDs
+CRGB leds_score_p1[NUM_LEDS_SCORE];
+CRGB leds_score_p2[NUM_LEDS_SCORE];
 
 //====== Matrix Data ======
 uint8_t matrix[kMatrixWidth][kMatrixHeight] = {0};
@@ -52,6 +81,10 @@ Start (first down, then right)
 {0, 0, 1, 1, 1, 0, 0}  --> Board 2
               End
 */
+
+const int16_t gameDelay = 1000; 
+const int16_t scoreDelay = 1000; 
+const int8_t gyroBetweenReadsDelay = 25; 
 
 //====== Player Board Data ======
 //Save boards as starting int + WIDTH
@@ -100,9 +133,6 @@ char* convert_int16_to_str(int16_t i) { // converts int16 to string. Moreover, r
   sprintf(tmp_str, "%6d", i);
   return tmp_str;
 }
-
-#define AD0_PIN 5
-
 
 
 //====== FastLED Methods ======
@@ -165,6 +195,17 @@ void doCrazyShit()
   FastLED.show();
 }
 
+void setupLEDs() {
+  //Matrix
+  FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  //Score P1
+  FastLED.addLeds<CHIPSET, DATA_PIN_SCORE_P1, COLOR_ORDER>(leds_score_p1, NUM_LEDS_SCORE);
+  //Score P2
+  FastLED.addLeds<CHIPSET, DATA_PIN_SCORE_P2, COLOR_ORDER>(leds_score_p2, NUM_LEDS_SCORE);
+
+  FastLED.setBrightness(BRIGHTNESS);
+}
+
 //====== Game Code ======
 
 void resetMatrix() {
@@ -202,7 +243,7 @@ void updateMatrix() {
   if (scoredHit) {
     resetBallPos();
     scoredHit = false;
-    delay(2000);
+    delay(scoreDelay);
   }
 }
 
@@ -358,7 +399,7 @@ void printOutMatrix() {
 
 //====== Gyro Methods ======
 
-void setupGyro() {
+void setupGyros() {
   //Setting the AD0 pin of one gyro to high changes his address, so they are differentiable
   pinMode(AD0_PIN, OUTPUT);
   digitalWrite(AD0_PIN, HIGH);
@@ -370,7 +411,7 @@ void setupGyro() {
   Wire.write(0); // set to zero (wakes up the MPU-6050)
   Wire.endTransmission(true);
 
-  delay(50);
+  delay(gyroBetweenReadsDelay);
 
   Wire.beginTransmission(MPU_ADDR2); // Begins a transmission to the I2C slave (GY-521 board)
   Wire.write(0x6B); // PWR_MGMT_1 register
@@ -405,7 +446,7 @@ void gyroLoop() {
   Serial.print(" | gZ = "); Serial.print(convert_int16_to_str(gyro_z));
   Serial.println();
 
-  delay(50);
+  delay(gyroBetweenReadsDelay);
 
   //Player 2's Balance Board
   Wire.beginTransmission(MPU_ADDR2);
@@ -432,25 +473,27 @@ void gyroLoop() {
   Serial.print(" | gZ2 = "); Serial.print(convert_int16_to_str(gyro_z2));
   Serial.println();
 
-  //Player 1 check
-  if (accelerometer_y < p1_left_threshhold) {
-    p1_holding_left = true;
-    p1_holding_right = false;
-  } else if (accelerometer_y > p1_right_threshhold) {
+  //=== Player Threshold Checks ===
+
+  //Player 1 
+  if (accelerometer_y < p1_right_threshold) { //Right
     p1_holding_left = false;
     p1_holding_right = true;
+  } else if (accelerometer_y > p1_left_threshold) { //Left
+    p1_holding_left = true;
+    p1_holding_right = false;
   } else {
     p1_holding_left = false;
     p1_holding_right = false;
   }
 
-  //Player 2 check
-  if (accelerometer_y2 < p2_left_threshhold) {
-    p2_holding_left = true;
-    p2_holding_right = false;
-  } else if (accelerometer_y2 > p2_right_threshhold) {
+  //Player 2 
+  if (accelerometer_y2 < p2_right_threshold) { //Right
     p2_holding_left = false;
     p2_holding_right = true;
+  } else if (accelerometer_y2 > p2_left_threshold) { //Left
+    p2_holding_left = true;
+    p2_holding_right = false;
   } else {
     p2_holding_left = false;
     p2_holding_right = false;
@@ -466,10 +509,9 @@ void setup()
   delay(2000);
 
   Serial.begin(9600);
-  setupGyro();
+  setupGyros();
 
-  FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
+  setupLEDs();
 }
 
 void loop() {
@@ -483,5 +525,5 @@ void loop() {
   convertMatrixToLEDs();
   FastLED.show();
 
-  delay(500);
+  delay(gameDelay);
 }

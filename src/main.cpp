@@ -96,6 +96,7 @@ const uint8_t B_WIDTH = 3;
 
 uint8_t player1Score = 0;
 uint8_t player2Score = 0;
+uint8_t maxScore = NUM_LEDS_SCORE;
 bool scoredHit = false;
 
 bool p1_holding_left = false;
@@ -260,6 +261,19 @@ void convertMatrixToLEDs() {
   }
 }
 
+void updateScoreLEDs() {
+  //Player 1
+  for(int i = 0; i < player1Score; i++) {
+    leds_score_p1[i] = CRGB::Red;
+  }
+  //Player 2
+  for(int i = 0; i < player2Score; i++) {
+    leds_score_p2[i] = CRGB::Blue;
+  }
+  
+  //TODO: Check for game end on max score and let all LEDs flash crazy shit (low brightness)
+}
+
 void runValidation() {
   //Check horizontal bounds first
   if(ballPos2D[0]==kMatrixHeight-1 && ballXDir > 0) { //going right ->
@@ -294,13 +308,19 @@ void runValidation() {
 
   //Check if scored --> reset ballPos
   if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check
-    player2Score ++;
+    if (player2Score < maxScore) {
+      player2Score ++;
+    }
+    
     scoredHit = true;
     Serial.println("===> Scored goal against P1");
     Serial.print("Player 1 score: "); Serial.println(player1Score);
   }
   else if (ballPos2D[1] == kMatrixWidth-1 && ballYDir > 0) { //against P2, dir down as safety check
-    player1Score ++;
+    if (player1Score < maxScore) {
+      player1Score ++;
+    }
+
     scoredHit = true;
     Serial.println("===> Scored goal against P2");
     Serial.print("Player 1 score: "); Serial.println(player1Score);
@@ -523,6 +543,7 @@ void loop() {
   moveBall();
   updateMatrix();
   convertMatrixToLEDs();
+  updateScoreLEDs();
   FastLED.show();
 
   delay(gameDelay);

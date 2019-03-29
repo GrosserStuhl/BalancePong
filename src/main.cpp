@@ -18,7 +18,9 @@
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
 
-#define BRIGHTNESS 20
+#define BRIGHTNESS 100
+//As to not use too much Ampere when displaying rainbow colors
+#define BRTNS_WINNER_SCENE 20
 
 //====== Gyro Pin to Change I2C Address ======
 #define AD0_PIN 3
@@ -252,11 +254,13 @@ void updateMatrix() {
       player2Score = 0;
 
       //Make a little show for the winner
+      FastLED.setBrightness(BRTNS_WINNER_SCENE);
       for(int i = 0; i < 200; i++) {
       doCrazyShit();
       delay(70);
       }
       delay(scoreDelay); //One more delay before new game start
+      FastLED.setBrightness(BRIGHTNESS);
     }
   }
 }

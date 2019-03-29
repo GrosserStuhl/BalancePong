@@ -18,7 +18,7 @@
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
 
-#define BRIGHTNESS 60
+#define BRIGHTNESS 20
 
 //====== Gyro Pin to Change I2C Address ======
 #define AD0_PIN 3
@@ -82,7 +82,7 @@ Start (first down, then right)
               End
 */
 
-const int16_t gameDelay = 1000; 
+const int16_t gameDelay = 350; 
 const int16_t scoreDelay = 1000; 
 const int8_t gyroBetweenReadsDelay = 25; 
 
@@ -185,14 +185,14 @@ void doCrazyShit()
   int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / kMatrixWidth));
   int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / kMatrixHeight));
   DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
-  if (ms < 5000)
-  {
-    FastLED.setBrightness(scale8(BRIGHTNESS, (ms * 256) / 5000));
-  }
-  else
-  {
-    FastLED.setBrightness(BRIGHTNESS);
-  }
+  // if (ms < 5000)
+  // {
+  //   FastLED.setBrightness(scale8(BRIGHTNESS, (ms * 256) / 5000));
+  // }
+  // else
+  // {
+  //   FastLED.setBrightness(BRIGHTNESS);
+  // }
   FastLED.show();
 }
 
@@ -245,6 +245,19 @@ void updateMatrix() {
     resetBallPos();
     scoredHit = false;
     delay(scoreDelay);
+
+    //Check if someone won
+    if (player1Score == maxScore || player2Score == maxScore) {
+      player1Score = 0;
+      player2Score = 0;
+
+      //Make a little show for the winner
+      for(int i = 0; i < 200; i++) {
+      doCrazyShit();
+      delay(70);
+      }
+      delay(scoreDelay); //One more delay before new game start
+    }
   }
 }
 
@@ -263,12 +276,12 @@ void convertMatrixToLEDs() {
 
 void updateScoreLEDs() {
   //Player 1
-  for(int i = 0; i < player1Score; i++) {
-    leds_score_p1[i] = CRGB::Red;
+  for(int i = 1; i < player1Score + 1; i++) {
+    leds_score_p1[NUM_LEDS_SCORE - i] = CRGB::Red;
   }
   //Player 2
-  for(int i = 0; i < player2Score; i++) {
-    leds_score_p2[i] = CRGB::Blue;
+  for(int i = 1; i < player2Score + 1; i++) {
+    leds_score_p2[NUM_LEDS_SCORE - i] = CRGB::Blue;
   }
   
   //TODO: Check for game end on max score and let all LEDs flash crazy shit (low brightness)
@@ -368,15 +381,13 @@ void handleInput() {
   //P1
   if (p1_holding_left) {
     moveBoard(1, LEFT);
-    //Here delay neccessary?
     Serial.println("### P1 holding left");
   } else if (p1_holding_right) {
     moveBoard(1, RIGHT);
-    //Here as well
     Serial.println("### P1 holding right");
   }
 
-  //Make separate IFs, so players don't block each other
+  //Separate IFs, so players don't block each other
 
   //P2
   if (p2_holding_left) {
@@ -495,6 +506,7 @@ void gyroLoop() {
 
   //=== Player Threshold Checks ===
 
+  //Somehow this logic for P1 makes sense and works correctly
   //Player 1 
   if (accelerometer_y < p1_right_threshold) { //Right
     p1_holding_left = false;
@@ -508,10 +520,10 @@ void gyroLoop() {
   }
 
   //Player 2 
-  if (accelerometer_y2 < p2_right_threshold) { //Right
+  if (accelerometer_y2 > p2_right_threshold) { //Right
     p2_holding_left = false;
     p2_holding_right = true;
-  } else if (accelerometer_y2 > p2_left_threshold) { //Left
+  } else if (accelerometer_y2 < p2_left_threshold) { //Left
     p2_holding_left = true;
     p2_holding_right = false;
   } else {

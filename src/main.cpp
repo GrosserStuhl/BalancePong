@@ -31,7 +31,6 @@
 #define RIGHT 1
 
 //=== Gyro Average Y-Value Distribution ===
-
 //Values in resting position:
 //p1: y1 = -1400 ~ -1700
 //p2: y2 = 1300 ~ 1600
@@ -58,7 +57,7 @@ const int16_t p2_right_threshold = 2700;
 const uint8_t kMatrixWidth = 18; //This is actually height
 const uint8_t kMatrixHeight = 11; //And this width
 
-// Param for different pixel layouts
+//Param for different pixel layouts
 //Our layout is not a snake, so it's false
 const bool kMatrixSerpentineLayout = false;
 
@@ -81,7 +80,7 @@ Start (first down, then right)
   0, 0, 0, 0, 0, 0, 0
   0, 0, 0, 0, 0, 0, 0
 {0, 0, 1, 1, 1, 0, 0}  --> Board 2
-              End
+                  End
 */
 
 const int16_t DELAY_NORMAL = 250; 
@@ -117,6 +116,16 @@ int ballXDir = 1;
 int ballYDir = 1;
 uint8_t ballSpeed = 1;
 
+//Diagonal ball hit detection variables
+// 0001 <- ball coming diagonally at board
+// 1110   from left or right
+//P1
+bool p1_ball_diag_from_left = (ballPos2D[0] == 1 && ballYDir < 0 && ballXDir > 0  && ballPos2D[0] ==  b1Start-1);
+bool p1_ball_diag_from_right = (ballPos2D[0] == 1 && ballYDir < 0 && ballXDir < 0  && ballPos2D[0] == b1Start + B_WIDTH);
+
+//P2
+bool p2_ball_diag_from_left = (ballPos2D[0] == kMatrixWidth-2 && ballYDir > 0 && ballXDir > 0  && ballPos2D[0] ==  b2Start-1);
+bool p2_ball_diag_from_right = (ballPos2D[0] == kMatrixWidth-2 && ballYDir > 0 && ballXDir < 0  && ballPos2D[0] == b2Start + B_WIDTH);
 
 
 //====== Gyro Params ======
@@ -291,20 +300,16 @@ void updateScoreLEDs() {
   for(int i = 1; i < player2Score + 1; i++) {
     leds_score_p2[NUM_LEDS_SCORE - i] = CRGB::Blue;
   }
-  
-  //TODO: Check for game end on max score and let all LEDs flash crazy shit (low brightness)
 }
 
 void runValidation() {
   //Check horizontal bounds first
   if(ballPos2D[0]==kMatrixHeight-1 && ballXDir > 0) { //going right ->
     ballXDir = -ballXDir; //Make ball "jump" away from wall
-    Serial.println("Hit RIGHT wall, ball dirX mirrored.");
-    Serial.println();
+    Serial.println("Hit RIGHT wall, ball dirX mirrored."); Serial.println();
   } else if (ballPos2D[0]==0 && ballXDir < 0) {//going left <-
       ballXDir = -ballXDir;
-      Serial.println("Hit LEFT wall, ball dirX mirrored.");
-      Serial.println();
+      Serial.println("Hit LEFT wall, ball dirX mirrored."); Serial.println();
   }
 
   //Check against board bounds
@@ -313,19 +318,26 @@ void runValidation() {
   //Player1
   else if (ballPos2D[1] == 1 && ballYDir < 0 
       && ballPos2D[0] >=  b1Start && ballPos2D[0] <= b1Start + B_WIDTH - 1) {
-    // ballXDir = -ballXDir;
     ballYDir = -ballYDir;
-    Serial.println("Ball blocked by P1");
-    Serial.println();
+    Serial.println("Ball blocked by P1"); Serial.println();
   } 
   //Player2
   else if (ballPos2D[1] == kMatrixWidth-2 && ballYDir > 0  
       && ballPos2D[0] >=  b2Start && ballPos2D[0] <= b2Start + B_WIDTH - 1) {
-    // ballXDir = -ballXDir;
     ballYDir = -ballYDir;
-    Serial.println("Ball blocked by P2");
-    Serial.println();
+    Serial.println("Ball blocked by P2"); Serial.println();
   }
+  //Extra check for diagonal blocking P1:
+  else if (p1_ball_diag_from_left || p1_ball_diag_from_right) {
+    ballYDir = -ballYDir;
+    Serial.println("Ball diag-blocked by P1"); Serial.println();
+  }
+  //P2
+  else if (p2_ball_diag_from_left || p2_ball_diag_from_right) {
+    ballYDir = -ballYDir;
+    Serial.println("Ball diag-blocked by P2"); Serial.println();
+  }
+  
 
   //Check if scored --> reset ballPos
   if (ballPos2D[1] == 0 && ballYDir < 0) { //against P1, dir up as safety check

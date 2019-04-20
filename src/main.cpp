@@ -33,8 +33,8 @@
 //=== Gyro Average Y-Value Distribution ===
 
 //Values in resting position:
-//p1: y1 = -800 ~ -1400
-//p2: y2 = 900 ~ 1600
+//p1: y1 = -1400 ~ -1700
+//p2: y2 = 1300 ~ 1600
 
 //Max values P1:
 //Left: y1 = -7000 ~ -7800
@@ -44,11 +44,11 @@
 //Left: y2 = -6000 ~ -6300
 //Right: y2 = 6000 ~ 6700
 
-const int16_t p1_left_threshold = -3400;
-const int16_t p1_right_threshold = 2500;
+const int16_t p1_left_threshold = -4000;
+const int16_t p1_right_threshold = 1300;
 
-const int16_t p2_left_threshold = -3000;
-const int16_t p2_right_threshold = 3300;
+const int16_t p2_left_threshold = -1800;
+const int16_t p2_right_threshold = 2700;
 
 
 
@@ -84,8 +84,10 @@ Start (first down, then right)
               End
 */
 
-const int16_t gameDelay = 350; 
-const int16_t scoreDelay = 1000; 
+const int16_t DELAY_NORMAL = 250; 
+const int16_t DELAY_FAST = 100; 
+int16_t gameDelay = DELAY_NORMAL; 
+const int16_t scoreDelay = 500; 
 const int8_t gyroBetweenReadsDelay = 25; 
 
 //====== Player Board Data ======
@@ -187,14 +189,6 @@ void doCrazyShit()
   int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / kMatrixWidth));
   int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / kMatrixHeight));
   DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
-  // if (ms < 5000)
-  // {
-  //   FastLED.setBrightness(scale8(BRIGHTNESS, (ms * 256) / 5000));
-  // }
-  // else
-  // {
-  //   FastLED.setBrightness(BRIGHTNESS);
-  // }
   FastLED.show();
 }
 
@@ -221,8 +215,8 @@ void resetMatrix() {
 
 //Reset to center + mirror direction
 void resetBallPos() {
-  ballPos2D[0] = kMatrixHeight/2;
-  ballPos2D[1] = kMatrixWidth/2;
+  ballPos2D[0] = kMatrixHeight / 2;
+  ballPos2D[1] = kMatrixWidth / 2;
   ballYDir = -ballYDir;
 }
 
@@ -249,19 +243,29 @@ void updateMatrix() {
     delay(scoreDelay);
 
     //Check if someone won
-    if (player1Score == maxScore || player2Score == maxScore) {
-      player1Score = 0;
-      player2Score = 0;
-
+    if (player1Score == maxScore - 1 || player2Score == maxScore - 1) {
+      
       //Make a little show for the winner
       FastLED.setBrightness(BRTNS_WINNER_SCENE);
-      for(int i = 0; i < 200; i++) {
+      for(int i = 0; i < 100; i++) {
       doCrazyShit();
       delay(70);
       }
       delay(scoreDelay); //One more delay before new game start
       FastLED.setBrightness(BRIGHTNESS);
+
+      //Reset scores and their LEDs
+      player1Score = 0;
+      player2Score = 0;
+      for(int i = 0; i < NUM_LEDS_SCORE; i++) {
+        leds_score_p1[i] = CRGB::Black;
+        leds_score_p2[i] = CRGB::Black;
+      }
+      gameDelay = DELAY_NORMAL;
+    } else if (player1Score == maxScore - 2 || player2Score == maxScore - 2) {
+        gameDelay = DELAY_FAST;
     }
+    
   }
 }
 
@@ -512,12 +516,12 @@ void gyroLoop() {
 
   //Somehow this logic for P1 makes sense and works correctly
   //Player 1 
-  if (accelerometer_y < p1_right_threshold) { //Right
-    p1_holding_left = false;
-    p1_holding_right = true;
-  } else if (accelerometer_y > p1_left_threshold) { //Left
+  if (accelerometer_y > p1_right_threshold) { //Left (because it's mirrored)
     p1_holding_left = true;
     p1_holding_right = false;
+  } else if (accelerometer_y < p1_left_threshold) { //Right (because it's mirrored)
+    p1_holding_left = false;
+    p1_holding_right = true;
   } else {
     p1_holding_left = false;
     p1_holding_right = false;
